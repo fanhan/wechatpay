@@ -1,0 +1,5 @@
+# wechatpay changelog
+
+## 2015-09-09 0.1
+
+* First public version.

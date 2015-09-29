@@ -9,7 +9,7 @@ About payment, please read the [wechat payment document](https://pay.weixin.qq.c
 #### how to install
 
 ```
-git clone
+git clone git@github.com:fanhan/wechatpay.git
 
 cd wechatpay
 python setup.py install
