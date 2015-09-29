@@ -23,7 +23,7 @@ class WechatPayment(object):
 
         class Payment(WechatPayment):
 
-            app_id = 'your_appid'
+            appid = 'your_appid'
             appSecret = 'your_appSecret'
             mch_id = 'your_mch_id'
             partnerKey = 'your_partnerKey'

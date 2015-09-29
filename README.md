@@ -23,7 +23,7 @@ python setup.py install
 from wechatpay import WechatPayment
 
 class Payment(WechatPayment):
-	app_id = 'your_appid'
+	appid = 'your_appid'
 	mch_id = 'your_mch_id'
 	appSecret = 'your_appSecret'
 	partnerKey = 'your_partnerKey'
