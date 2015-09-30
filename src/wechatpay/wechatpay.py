@@ -102,7 +102,7 @@ class WechatPayment(object):
             'body': self.get_body(params.get('body')),
         })
 
-        # Get sign
+        # get sign
         params['sign'] = self.build_sign(**params)
 
         # Set post xml str

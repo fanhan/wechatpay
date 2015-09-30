@@ -1,5 +1,5 @@
 # -*- coding:utf-8 -*-
 
-from wechatpay import WechatPayment
+from wechatpay import WechatPay
 
 __version__ = "0.1"

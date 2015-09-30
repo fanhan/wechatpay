@@ -1,10 +1,10 @@
-WechatPayment
+WechatPay
 =============
 
-WechatPayment is a sdk for wechat payment, Before using this, you need to set up the configuration of wechat payment.
+WechatPay is a sdk for wechat pay, Before using this, you need to set up the configuration of wechat pay.
 
 
-About payment, please read the [wechat payment document](https://pay.weixin.qq.com/wiki/doc/api/index.html)
+About pay, please read the [wechat pay document](https://pay.weixin.qq.com/wiki/doc/api/index.html)
 
 #### how to install
 
@@ -20,9 +20,9 @@ python setup.py install
 #### how to use?
 
 ```python
-from wechatpay import WechatPayment
+from wechatpay import WechatPay
 
-class Payment(WechatPayment):
+class Pay(WechatPay):
 	appid = 'your_appid'
 	mch_id = 'your_mch_id'
 	appSecret = 'your_appSecret'
@@ -39,7 +39,7 @@ params = {
 	'spbill_create_ip': '127.0.0.1'
 }
 
-ret = Payment().app_pay(params)
+ret = Pay().app_pay(params)
 
 # for qr code pay
 params = {
@@ -51,7 +51,7 @@ params = {
 	'product_id': '1111'
 }
 
-ret = Payment().qrcode_pay(params)
+ret = Pay().qrcode_pay(params)
 
 # for jsapi pay
 
@@ -64,7 +64,7 @@ params = {
 	'openid': 'xxxxxx'   # from wechat service get openid
 }
 
-ret = Payment().jsapi_pay(params)
+ret = Pay().jsapi_pay(params)
 ```
 
 [how to get openid](https://pay.weixin.qq.com/wiki/doc/api/app.php?chapter=4_4)
