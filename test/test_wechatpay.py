@@ -1,5 +1,9 @@
 # -*- coding:utf-8 -*-
 
+import sys
+
+sys.path.append('../src/')
+
 from wechatpay import WechatPay
 
 
@@ -14,11 +18,11 @@ class Pay(WechatPay):
 def main():
     params = {
         'body': '测试订单',
-        'out_trade_no': 'local1231231241232',
+        'out_trade_no': 'local123123124123239',
         'total_fee': 1,
         'fee_type': 'CNY',
         'spbill_create_ip': '127.0.0.1',
-        'product_id': 1231231,
+        'product_id': 123123123,
     }
     print Pay().qrcode_pay(params)
     return

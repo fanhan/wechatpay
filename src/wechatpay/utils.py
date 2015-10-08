@@ -3,15 +3,8 @@
 import time
 import types
 import json
-import logging
 import requests
 import hashlib
-
-FORMAT = '%(asctime)-15s %(message)s'
-logging.basicConfig(format=FORMAT)
-logger = logging.getLogger()
-level = logging.getLevelName('INFO')
-logger.setLevel(level)
 
 
 class Promise(object):
@@ -75,9 +68,4 @@ def get_wechat_openid(appid, appsecret, code):
         ret = json.loads(r.text)
     except Exception as e:
         raise Exception('Failed to get openid, %s' % e)
-
-    if not ret.get('errcode'):
-        return ret
-
-    logger.info('Failed to get openid, %s', json.dumps(ret))
     return ret

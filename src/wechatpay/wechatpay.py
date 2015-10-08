@@ -1,17 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import json
 import hashlib
 import requests
 import xml.etree.ElementTree as ET
 
-from utils import smart_str, logger
+from utils import smart_str
 from utils import get_noncestr
 
 
 class WechatPay(object):
     """
-    Wechat Payment
+    Wechat Pay
     ~~~~~~~~~~
     This class want to solve wechat payment problem.
     Before using this class, you need to set up the configuration of wechat
@@ -21,7 +20,7 @@ class WechatPay(object):
 
         from wechatpay import WechatPay
 
-        class Payment(WechatPay):
+        class Pay(WechatPay):
 
             appid = 'your_appid'
             appSecret = 'your_appSecret'
@@ -29,26 +28,23 @@ class WechatPay(object):
             partnerKey = 'your_partnerKey'
             notify_url = 'your_notify_url'
 
-        wechat_payment_sdk_params = Payment().app_pay(params)
-
+        ret = Pay().app_pay(params)
     """
     appid = ''
     appSecret = ''
     mch_id = ''
     partnerKey = ''
     notify_url = ''
+    cert = ''
 
-    PAYMENT_URL = 'https://api.mch.weixin.qq.com/pay/unifiedorder'
+    PAY_URL = 'https://api.mch.weixin.qq.com/pay/unifiedorder'
+    MICRO_PAY_URL = 'https://api.mch.weixin.qq.com/pay/micropay'
     BASE_PARAMS_KEYS = ['body', 'out_trade_no', 'total_fee', 'spbill_create_ip']
     PARAMS_DICT = {
         'NATIVE': ['product_id'],
         'JSAPI': ['openid'],
+        'MICRO': ['auth_code'],
     }
-
-    def _check_params(self, keys, params):
-        for key in keys:
-            if key not in params:
-                raise KeyError(key)
 
     def create_sign_string(self, **kwargs):
         """
@@ -63,7 +59,7 @@ class WechatPay(object):
 
     def build_sign(self, **kwargs):
         """
-        build wechat payment signature
+        build wechat pay signature
         """
         sign_temp = '%s&key=%s' % (self.create_sign_string(**kwargs),
                                    self.partnerKey)
@@ -92,41 +88,50 @@ class WechatPay(object):
             body = '%s...' % body[:28]
         return body
 
-    def execute(self, params, retries=3):
-        # params udpate config
-        params.update({
-            'appid': self.appid,
-            'mch_id': self.mch_id,
-            'notify_url': self.notify_url,
-            'nonce_str': get_noncestr(),
-            'body': self.get_body(params.get('body')),
-        })
+    def _check_choose_params(self, transaction_id=None, out_trade_no=None):
+        ret = {}
+        if transaction_id:
+            ret.update(transaction_id=transaction_id)
+        elif not transaction_id and out_trade_no:
+            ret.update(out_trade_no=out_trade_no)
+        else:
+            raise Exception('transaction_id or out_trade_no must have one')
+        return ret
 
-        # get sign
+    def _check_params(self, keys, params):
+        for key in keys:
+            if not params.get(key):
+                raise KeyError(key)
+
+    def _request(self, url, params, retries=3, is_cert=False):
+        if not isinstance(params, dict):
+            raise Exception('params must be a dict')
+
         params['sign'] = self.build_sign(**params)
 
-        # Set post xml str
         xml_str = self.to_xml(**params)
 
         ret = {}
+        error = None
         for i in xrange(retries):
-            r = requests.post(self.PAYMENT_URL, data=smart_str(xml_str))
+            try:
+                if is_cert:
+                    r = requests.post(url, data=smart_str(xml_str),
+                                      cert=self.cert)
+                else:
+                    r = requests.post(url, data=smart_str(xml_str))
 
-            for child in ET.fromstring(smart_str(r.text)):
-                ret[child.tag] = child.text
-
-            if ret.get('prepay_id'):
-                logger.info('Successfully got prepay_id via UnifiedOrder, %s'
-                            % json.dumps(ret))
+                for child in ET.fromstring(smart_str(r.text)):
+                    ret[child.tag] = child.text
                 return ret
-
-        logger.error('Failed to get prepay_id via UnifiedOrder, %s'
-                     % json.dumps(ret))
-        return {}
+            except Exception as e:
+                error = e
+                continue
+        raise 'Failed to request url, %s' % error
 
     def pay(self, params, trade_type='APP'):
         if not isinstance(params, dict):
-            raise Exception('params is not a dict')
+            raise Exception('params must be a dict')
 
         # check params
         params_keys = self.BASE_PARAMS_KEYS[:]
@@ -135,16 +140,99 @@ class WechatPay(object):
 
         retries = params.pop('retries', 3)
 
-        # set trade type
+        # params udpate config
         params.update({
-            'trade_type': trade_type,
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+            'body': self.get_body(params.get('body')),
         })
 
-        return self.execute(params, retries=retries)
+        if trade_type != 'MICRO':
+            params.update(notify_url=self.notify_url, trade_type=trade_type)
+
+        url = self.MICRO_PAY_URL if trade_type == 'MICRO' else self.PAY_URL
+        return self._request(url, params, retries=retries)
+
+    def order_query(self, transaction_id=None, out_trade_no=None):
+        # ducument: https://pay.weixin.qq.com/wiki/doc/api/micropay.php?chapter=9_2
+        params = self._check_choose_params(transaction_id=transaction_id,
+                                           out_trade_no=out_trade_no)
+        url = 'https://api.mch.weixin.qq.com/pay/orderquery'
+        params.update({
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+        })
+        return self._request(url, params)
+
+    def order_reverse(self, out_trade_no, transaction_id=None):
+        # document: https://pay.weixin.qq.com/wiki/doc/api/micropay.php?chapter=9_11&index=3
+        params = {
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+        }
+        if transaction_id:
+            params.update(transaction_id=transaction_id)
+        else:
+            params.update(out_trade_no=out_trade_no)
+
+        url = 'https://api.mch.weixin.qq.com/secapi/pay/reverse'
+        return self._request(url, params, is_cert=True)
+
+    def order_refund(self, params):
+        # document: https://pay.weixin.qq.com/wiki/doc/api/micropay.php?chapter=9_4
+        transaction_id = params.pop('transaction_id', None)
+        out_trade_no = params.pop('out_trade_no', None)
+        params.update(self._check_choose_params(transaction_id=transaction_id,
+                                                out_trade_no=out_trade_no))
+
+        params_keys = ['out_refund_no', 'total_fee', 'refund_fee']
+        self._check_params(params_keys, params)
+
+        params['op_user_id'] = params.get('op_user_id', self.mch_id)
+
+        url = 'https://api.mch.weixin.qq.com/secapi/pay/refund'
+        params.update({
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+        })
+        return self._request(url, params, is_cert=True)
+
+    def refund_order_query(self, params):
+        # document: https://pay.weixin.qq.com/wiki/doc/api/micropay.php?chapter=9_5
+        keys = ['transaction_id', 'out_trade_no', 'out_refund_no',
+                'out_refund_no']
+        is_True = False
+        for key in keys:
+            is_True = True if params.get(key) else is_True
+
+        if not is_True:
+            raise Exception('%s must have one' % ','.join(keys))
+
+        params.update({
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+        })
+        url = 'https://api.mch.weixin.qq.com/pay/refundquery'
+        return self._request(url, params)
+
+    def short_url(self, long_url):
+        # document: https://pay.weixin.qq.com/wiki/doc/api/micropay.php?chapter=9_9&index=8
+        params = {
+            'appid': self.appid,
+            'mch_id': self.mch_id,
+            'nonce_str': get_noncestr(),
+            'long_url': long_url,
+        }
+        return self._request(url, params)
 
     def app_pay(self, params):
         """
-        for app sdk payment
+        for app sdk pay
         ~~~~~~~~~~~~~~~~~~~
         :param
             body: your order title
@@ -168,7 +256,7 @@ class WechatPay(object):
 
     def qrcode_pay(self, params):
         """
-        for qr-code payment
+        for qr-code pay
         ~~~~~~~~~~~~~~~~~~~
         :param:
             body: your order title
@@ -193,7 +281,7 @@ class WechatPay(object):
 
     def jsapi_pay(self, params):
         """
-        for JSAPI payment
+        for JSAPI pay
         ~~~~~~~~~~~~~~~~~~~
         :param:
             body: your order title
@@ -214,3 +302,38 @@ class WechatPay(object):
             }
         """
         return self.pay(params, trade_type='JSAPI')
+
+    def micropay(self, params):
+        """
+        micro pay
+        ~~~~~~~~~
+        :param:
+            body: your order title
+            out_trade_no: your order id
+            total_fee: your order price
+            spbill_create_ip: ip address
+            auth_code:
+        :return:
+            {
+                'openid': '',
+                'trade_type': 'MICROPAY',
+                'cash_fee_type': None,
+                'cash_fee': '1',
+                'is_subscribe': 'N',
+                'nonce_str': 'vswDZHsCkHUy50nA',
+                'return_code': 'SUCCESS',
+                'return_msg': 'OK',
+                'sign': '02022866F63FAA5FEA4FEE2C7DF0C013',
+                'bank_type': '',
+                'attach': None,
+                'mch_id': '',
+                'out_trade_no': '',
+                'transaction_id': '',
+                'total_fee': '1',
+                'appid': '',
+                'fee_type': 'CNY',
+                'time_end': '20151008160601',
+                'result_code': 'SUCCESS'
+            }
+        """
+        return self.pay(params, trade_type='MICRO')
