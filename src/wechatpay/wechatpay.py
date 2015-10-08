@@ -9,7 +9,7 @@ from utils import smart_str, logger
 from utils import get_noncestr
 
 
-class WechatPayment(object):
+class WechatPay(object):
     """
     Wechat Payment
     ~~~~~~~~~~
@@ -19,9 +19,9 @@ class WechatPayment(object):
 
     Usage::
 
-        from wechatpay import WechatPayment
+        from wechatpay import WechatPay
 
-        class Payment(WechatPayment):
+        class Payment(WechatPay):
 
             appid = 'your_appid'
             appSecret = 'your_appSecret'
