@@ -15,6 +15,13 @@ cd wechatpay
 python setup.py install
 ```
 
+or
+
+```
+pip install wechat_pay
+```
+
+
 [how to get openid](https://pay.weixin.qq.com/wiki/doc/api/app.php?chapter=4_4)
 
 #### how to use?
